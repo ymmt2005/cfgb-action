@@ -7,7 +7,8 @@ independent open-source project not affiliated with Cloudflare, Inc.
 version or active workflow is provided yet.**
 
 `ymmt2005/cfgb-action` will install the exact release requested through
-`cfgb-version`, verify its checksum and register the CLI on PATH. Subsequent
+`cfgb-version`, verify executable bytes against the required caller-pinned
+`cfgb-sha256` and register the CLI on PATH. Subsequent
 workflow `run` steps invoke `cfgb` directly. The v1 Action has no `operation`
 selector or wrappers for individual CLI commands.
 
@@ -22,7 +23,8 @@ selector or wrappers for individual CLI commands.
 Setup requires no checkout or blog configuration and uses no AI/upload credentials.
 Caller workflows configure checkout, job permissions and build prerequisites,
 then execute the desired CLI commands. Action and CLI releases are independently
-pinned. Content repositories remain free of framework/Worker implementation files.
+pinned; the caller independently pins the CLI executable digest for its runner
+OS/architecture. Content repositories remain free of framework/Worker implementation files.
 
 The default delivery architecture uses GitHub Actions for authoring/checks and
 Cloudflare Workers Builds for deployment. Setup does not change that division.

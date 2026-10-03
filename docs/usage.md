@@ -3,7 +3,11 @@
 These are illustrative future step snippets, not active or currently runnable
 workflows. The Action and CLI are not implemented or released. Replace
 `<full-action-commit-sha>` and `vX.Y.Z` with reviewed published versions when they
-exist. Setup installs CFGB once per job; subsequent `run` steps call the CLI.
+exist. Every snippet also requires trusted `vars.CFGB_SHA256`: an independently
+reviewed lowercase SHA-256 of executable bytes for the job runner, not a checksum
+fetched during setup. The examples assume Linux/amd64 to match Workers Builds;
+other runner targets require their own reviewed digest. Setup installs CFGB once
+per job; subsequent `run` steps call the CLI.
 See the [canonical contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/09-github-action.md).
 
 ## Read-only authoring checks
@@ -16,6 +20,7 @@ with `contents: read` and no secrets:
   uses: ymmt2005/cfgb-action@<full-action-commit-sha>
   with:
     cfgb-version: vX.Y.Z
+    cfgb-sha256: ${{ vars.CFGB_SHA256 }}
 - name: Validate authoring content
   run: cfgb validate --authoring
 ```
@@ -34,6 +39,7 @@ needed authoring credentials, select content explicitly:
   uses: ymmt2005/cfgb-action@<full-action-commit-sha>
   with:
     cfgb-version: vX.Y.Z
+    cfgb-sha256: ${{ vars.CFGB_SHA256 }}
 - name: Prepare assets and link-card metadata
   run: cfgb prepare 2026/2026-09-19-protobuf-guide
 - name: Generate eligible summaries
@@ -61,6 +67,7 @@ and package-manager setup compatible with the pinned CFGB release:
   uses: ymmt2005/cfgb-action@<full-action-commit-sha>
   with:
     cfgb-version: vX.Y.Z
+    cfgb-sha256: ${{ vars.CFGB_SHA256 }}
 - name: Check publication conditions
   run: cfgb validate --publish
 - name: Build the verified artifact
@@ -88,6 +95,9 @@ environment without rendering again. A GitHub upload job must check out the
 actual reviewed named branch; a detached checkout is sufficient only for checks
 and building. Worker-level `preview_worker` Access is the standard preview policy.
 
-Action reference and `cfgb-version` are independently pinned. Each job performs
+Pin the Action reference, `cfgb-version` and `cfgb-sha256` independently. For
+GitHub checks and Workers Builds using the same OS/architecture, match the version
+and digest pins exactly to verify identical CLI bytes. Immutable CFGB release
+artifacts do not remove the required digest input. Each job performs
 its own setup; the registered PATH is available only within that job. Normal CLI
 arguments, selection and diagnostics follow the CLI specification directly.
