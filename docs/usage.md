@@ -73,13 +73,20 @@ Build does not upload. CLI failures fail their workflow steps; there is no Actio
 wrapper for command exit codes, diagnostics or artifact/preview outputs.
 
 In the default architecture, Workers Builds separately checks out the matching
-commit and runs `cfgb build`, then `cfgb deploy` or `cfgb preview`. Its upload
+commit, bootstraps the pinned binary under HOME, then runs `cfgb build` and
+`cfgb deploy` or `cfgb preview` using that installed binary. The
+[build runtime contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/10-build-runtime.md)
+defines retained toolchain sessions, runtime checks and CI provenance. Its upload
 command consumes its own verified artifact without rebuilding. Do not upload again
 from this GitHub job. If deployment ownership is explicitly moved to GitHub,
 install CFGB in that job and use `run: cfgb deploy --from dist` or
 `run: cfgb preview --from dist`, with matching source provenance and the CLI's
 upload environment variables. Private-preview Access checks remain mandatory.
-Cross-job artifact transfer must preserve all verified bytes and source identity.
+Cross-job artifact transfer must preserve all verified bytes and source identity;
+the CLI may recreate the same pinned upload toolchain outside the original
+environment without rendering again. A GitHub upload job must check out the
+actual reviewed named branch; a detached checkout is sufficient only for checks
+and building. Worker-level `preview_worker` Access is the standard preview policy.
 
 Action reference and `cfgb-version` are independently pinned. Each job performs
 its own setup; the registered PATH is available only within that job. Normal CLI

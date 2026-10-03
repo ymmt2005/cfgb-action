@@ -34,6 +34,7 @@ Action repository and entry point.
 - [Canonical setup specification](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/09-github-action.md): installation, inputs/outputs, versioning and acceptance.
 - [Usage design](docs/usage.md): setup followed by direct CLI commands.
 - [CLI contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/01-cli.md).
+- [Build runtime contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/10-build-runtime.md): release assets, runtime prerequisites and retained CLI toolchain sessions.
 - [Delivery contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/04-delivery.md).
 
 Future implementation will provide one `action.yml` at the repository root for
