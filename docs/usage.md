@@ -56,7 +56,10 @@ provided to the selected CLI step, not to the setup Action.
 
 ## Final checks and artifact build
 
-Use a clean checkout of the final head, no AI/upload credentials, and a Node.js
+A workflow may check out a clean copy of the final head for these checks. That
+is the workflow's checkout choice. Upload accepts the supplied artifact from a
+dirty tree, and it accepts an artifact whose recorded commit, branch, or build
+ID differs from the current checkout. Use no AI/upload credentials, and a Node.js
 and package-manager setup compatible with the pinned CFGB release:
 
 ```yaml
@@ -66,7 +69,7 @@ and package-manager setup compatible with the pinned CFGB release:
     cfgb-version: vX.Y.Z
 - name: Check publication conditions
   run: cfgb validate --publish
-- name: Build the verified artifact
+- name: Build the site artifact
   run: cfgb build --out dist
 ```
 
@@ -75,21 +78,25 @@ run separately without that publication check, using `build`'s default validatio
 Build does not upload. CLI failures fail their workflow steps; there is no Action
 wrapper for command exit codes, diagnostics or artifact/preview outputs.
 
-In the default architecture, Workers Builds separately checks out the matching
-commit, bootstraps the pinned binary under HOME, then runs `cfgb build` and
+In the default architecture, Workers Builds checks out the branch it is building,
+bootstraps the pinned binary under HOME, then runs `cfgb build` and
 `cfgb deploy` or `cfgb preview` using that installed binary. The
 [build runtime contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/10-build-runtime.md)
-defines retained toolchain sessions, runtime checks and CI provenance. Its upload
-command consumes its own verified artifact without rebuilding. Do not upload again
+defines retained toolchain sessions, the runtime checks needed to run Wrangler,
+and optional diagnostic source metadata. Its upload command uploads the supplied
+artifact without rebuilding or changing its bytes. Do not upload again
 from this GitHub job. If deployment ownership is explicitly moved to GitHub,
 install CFGB in that job and use `run: cfgb deploy --from dist` or
-`run: cfgb preview --from dist`, with matching source provenance and the CLI's
-upload environment variables. Private-preview Access checks remain mandatory.
-Cross-job artifact transfer must preserve all verified bytes and source identity;
-the CLI may recreate the same pinned upload toolchain outside the original
-environment without rendering again. A GitHub upload job must check out the
-actual reviewed named branch; a detached checkout is sufficient only for checks
-and building. Worker-level `preview_worker` Access is the standard preview policy.
+`run: cfgb preview --from dist`, with the CLI's upload environment variables.
+`deploy` requires the current invocation's branch to equal
+`deploy.productionBranch`. `preview` requires a different branch. Recorded
+commit, branch, and build ID stay optional diagnostics. Private-preview Access
+checks remain mandatory. Cross-job transfer hands the upload job the artifact
+bytes from the build. The CLI may recreate the same pinned upload toolchain
+outside the original environment without rendering again, and it leaves those
+bytes unchanged. The upload job's current branch is the branch the
+production-branch guard uses. A detached checkout can run checks and `cfgb build`.
+Worker-level `preview_worker` Access is the standard preview policy.
 
 Pin the Action reference and `cfgb-version` independently. Match the exact CLI
 release used in GitHub checks and Workers Builds. Workers Builds separately pins
