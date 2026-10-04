@@ -19,6 +19,7 @@ steps:
     with:
       node-version: ${{ steps.cfgb.outputs.node-version }}
   - name: Install the tested npm version
+    shell: bash
     env:
       NPM_VERSION: ${{ steps.cfgb.outputs.npm-version }}
     run: npm install --global "npm@$NPM_VERSION"
@@ -37,6 +38,7 @@ installation/build steps with:
 
 ```yaml
 - name: Install the tested pnpm version
+  shell: bash
   env:
     PNPM_VERSION: ${{ steps.cfgb.outputs.pnpm-version }}
   run: npm install --global "pnpm@$PNPM_VERSION"

@@ -80,6 +80,7 @@ steps:
     with:
       node-version: ${{ steps.cfgb.outputs.node-version }}
   - name: Install the tested npm version
+    shell: bash
     env:
       NPM_VERSION: ${{ steps.cfgb.outputs.npm-version }}
     run: npm install --global "npm@$NPM_VERSION"
