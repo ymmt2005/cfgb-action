@@ -1,0 +1,18 @@
+name: Set up CFGB
+description: Install an exact immutable CFGB release and verify its release attestation
+inputs:
+  cfgb-version:
+    description: Exact CFGB release tag (for example v0.1.0)
+    required: true
+  github-token:
+    description: Token for read-only public release verification
+    default: ${{ github.token }}
+    required: false
+outputs:
+  cfgb-version:
+    description: Verified installed version
+  cfgb-path:
+    description: Absolute path to the installed executable
+runs:
+  using: node24
+  main: src/main.mjs
