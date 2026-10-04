@@ -1,107 +1,50 @@
-# Usage design
+# Using the setup Action
 
-These are illustrative future step snippets, not active or currently runnable
-workflows. The Action and CLI are not implemented or released. Replace
-`<full-action-commit-sha>` and `vX.Y.Z` with reviewed published versions when they
-exist. The Action selects the runner-specific asset and verifies its immutable
-release and GitHub release attestation. The caller supplies only the exact CLI
-version; supported platform selection needs no digest matrix. Setup installs CFGB
-once per job; subsequent `run` steps call the CLI.
-See the [canonical contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/09-github-action.md).
+`cfgb-action` installs the CLI; caller workflows own checkout, runtime prerequisites,
+permissions and hosting. Pin a reviewed full Action commit SHA and independently
+select the exact CLI release. CFGB v0.1.0 implements `build` and `version`.
 
-## Read-only authoring checks
-
-After a checkout of the exact PR head with no persisted credentials, in a job
-with `contents: read` and no secrets:
+A static-site build can use:
 
 ```yaml
-- name: Set up CFGB
-  uses: ymmt2005/cfgb-action@<full-action-commit-sha>
-  with:
-    cfgb-version: vX.Y.Z
-- name: Validate authoring content
-  run: cfgb validate --authoring
+permissions:
+  contents: read
+steps:
+  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+    with:
+      node-version: '24.21.0'
+  - run: npm install -g npm@12.2.0
+  - uses: ymmt2005/cfgb-action@<full-reviewed-action-commit-sha>
+    with:
+      cfgb-version: v0.1.0
+  - run: cfgb build --out dist --base-url https://example.github.io/blog/ --static
 ```
 
-Missing/empty summaries are warnings and succeed. Invalid structural values
-remain errors. Fork PRs run these credential-free checks only. Setup itself can
-run before checkout and does not inspect article content.
+`--base-url` overrides the public URL for that invocation without editing
+`cfgb.yaml`. `--static` supplies a default-language entry page, HTML alias redirects
+and direct language links for hosts without the locale Worker. Upload `dist/site/`
+with the provider's action. GitHub Pages requires enabling GitHub Actions as its
+publication source and a deploy job with `pages: write` and `id-token: write`.
+See the [example workflow](https://github.com/ymmt2005/cfgb-example/tree/main/.github/workflows).
 
-## Trusted content preparation
+Setup itself can run before checkout and needs no Node/package-manager setup.
+The build prerequisites above belong to `cfgb build`, not installation. The
+optional `github-token` defaults to the job's read-only GitHub token. The Action
+verifies the immutable release and asset with its pinned GitHub CLI verifier;
+callers do not provide platform-specific checksums.
 
-In a separate trusted job with reviewed base-branch configuration and only the
-needed authoring credentials, select content explicitly:
+The Action exports `cfgb-version` and `cfgb-path`, and registers PATH for later
+steps in that job. Every job needing CFGB runs its own setup. Native CLI failures
+remain step failures. There are no wrappers for CLI operations or deployment.
 
-```yaml
-- name: Set up CFGB
-  uses: ymmt2005/cfgb-action@<full-action-commit-sha>
-  with:
-    cfgb-version: vX.Y.Z
-- name: Prepare assets and link-card metadata
-  run: cfgb prepare 2026/2026-09-19-protobuf-guide
-- name: Generate eligible summaries
-  run: cfgb summarize 2026/2026-09-19-protobuf-guide
-  env:
-    CFGB_CF_ACCOUNT_ID: ${{ secrets.CFGB_CF_ACCOUNT_ID }}
-    CFGB_CF_GATEWAY_ID: ${{ secrets.CFGB_CF_GATEWAY_ID }}
-    CFGB_CF_AIG_TOKEN: ${{ secrets.CFGB_CF_AIG_TOKEN }}
-```
+Cloudflare deployment remains a separate architecture. The default build produces
+an artifact with a Worker, while Workers Builds bootstrap/upload commands are
+future CLI work. Build artifacts are editable static-site output; recorded source
+metadata is diagnostic, not an integrity/provenance security boundary. Executable
+release verification is a separate requirement.
 
-This assumes a reviewed enabled AI/model configuration and the Gateway-held-key
-mode. Other credential modes follow the AI contract. `prepare` never calls AI.
-`summarize` preserves manual edits and does not commit. A caller bot step may
-commit only allowed generated files after rechecking the PR head, using a scoped
-GitHub App token. Final checks must then run on the new head. Credentials are
-provided to the selected CLI step, not to the setup Action.
-
-## Final checks and artifact build
-
-A workflow may check out a clean copy of the final head for these checks. That
-is the workflow's checkout choice. Upload accepts the supplied artifact from a
-dirty tree, and it accepts an artifact whose recorded commit, branch, or build
-ID differs from the current checkout. Use no AI/upload credentials, and a Node.js
-and package-manager setup compatible with the pinned CFGB release:
-
-```yaml
-- name: Set up CFGB
-  uses: ymmt2005/cfgb-action@<full-action-commit-sha>
-  with:
-    cfgb-version: vX.Y.Z
-- name: Check publication conditions
-  run: cfgb validate --publish
-- name: Build the site artifact
-  run: cfgb build --out dist
-```
-
-A future-dated article fails the publication check. A preview-oriented build can
-run separately without that publication check, using `build`'s default validation.
-Build does not upload. CLI failures fail their workflow steps; there is no Action
-wrapper for command exit codes, diagnostics or artifact/preview outputs.
-
-In the default architecture, Workers Builds checks out the branch it is building,
-bootstraps the pinned binary under HOME, then runs `cfgb build` and
-`cfgb deploy` or `cfgb preview` using that installed binary. The
-[build runtime contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/10-build-runtime.md)
-defines retained toolchain sessions, the runtime checks needed to run Wrangler,
-and optional diagnostic source metadata. Its upload command uploads the supplied
-artifact without rebuilding or changing its bytes. Do not upload again
-from this GitHub job. If deployment ownership is explicitly moved to GitHub,
-install CFGB in that job and use `run: cfgb deploy --from dist` or
-`run: cfgb preview --from dist`, with the CLI's upload environment variables.
-`deploy` requires the current invocation's branch to equal
-`deploy.productionBranch`. `preview` requires a different branch. Recorded
-commit, branch, and build ID stay optional diagnostics. Private-preview Access
-checks remain mandatory. Cross-job transfer hands the upload job the artifact
-bytes from the build. The CLI may recreate the same pinned upload toolchain
-outside the original environment without rendering again, and it leaves those
-bytes unchanged. The upload job's current branch is the branch the
-production-branch guard uses. A detached checkout can run checks and `cfgb build`.
-Worker-level `preview_worker` Access is the standard preview policy.
-
-Pin the Action reference and `cfgb-version` independently. Match the exact CLI
-release used in GitHub checks and Workers Builds. Workers Builds separately pins
-`CFGB_SHA256` for its fixed Linux/amd64 asset; that reviewed digest must match
-the asset in the verified release attestation. Other Action runner targets select
-their respective assets from the same immutable release. Each job performs
-its own setup; the registered PATH is available only within that job. Normal CLI
-arguments, selection and diagnostics follow the CLI specification directly.
+Design contracts for future authoring, migration and upload commands live in
+[CFGB's specifications](https://github.com/ymmt2005/cfgb/tree/main/docs/spec).
+Do not invoke commands absent from the selected release or treat their fixtures
+as already executed acceptance tests.

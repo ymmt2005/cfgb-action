@@ -1,49 +1,69 @@
 # CFGB Action — Git-based Blog on Cloudflare
 
-The GitHub setup Action for **CFGB — Git-based Blog on Cloudflare**, an
-independent open-source project not affiliated with Cloudflare, Inc.
+Install an exact immutable [CFGB release](https://github.com/ymmt2005/cfgb/releases)
+and register the CLI on PATH. Later workflow steps call `cfgb` directly. This is
+an independent open-source project, not affiliated with Cloudflare, Inc.
 
-**Status: design and documentation only. No Action implementation, published
-version or active workflow is provided yet.**
+```yaml
+- uses: ymmt2005/cfgb-action@<full-reviewed-action-commit-sha>
+  with:
+    cfgb-version: v0.1.0
+- run: cfgb version
+```
 
-`ymmt2005/cfgb-action` will install the exact release requested through
-`cfgb-version`, select the runner-specific asset, verify the immutable release
-and GitHub release attestation, and register the CLI on PATH. Subsequent
-workflow `run` steps invoke `cfgb` directly. The v1 Action has no `operation`
-selector or wrappers for individual CLI commands.
+Pin the Action commit separately from the CLI version. `cfgb-version` is required;
+there is no implicit latest or version range. Linux, macOS and Windows runners
+are supported on amd64 and arm64. Setup needs no content checkout, blog settings,
+caller-configured Node.js, AI credentials or upload credentials. Self-hosted
+runners need internet access and a native `tar` capable of extracting the pinned
+GitHub CLI archive. GitHub-hosted runners provide it.
 
-## Responsibilities
+## Verification and outputs
 
-| Repository | Responsibility |
-| --- | --- |
-| [cfgb](https://github.com/ymmt2005/cfgb) | Go CLI, embedded renderer/Worker, schemas, prompts and domain rules |
-| This repository | Verified CLI installation, cache/PATH handling, setup outputs and Action tests |
-| [cfgb-example](https://github.com/ymmt2005/cfgb-example) | Synthetic content and CLI conformance corpus |
+The Action checks that the exact CLI release is published and immutable, then
+verifies the release and selected raw executable against GitHub's release
+attestation before executing it. It checks the executable's reported version.
+Missing or invalid evidence fails setup. No caller-specific digest is required.
 
-Setup requires no checkout or blog configuration and uses no AI/upload credentials.
-Caller workflows configure checkout, job permissions and build prerequisites,
-then execute the desired CLI commands. Action and CLI releases are independently
-pinned. Platform selection and attestation verification belong to the Action;
-callers need no platform-specific digest configuration. Content repositories remain free of framework/Worker implementation files.
+The GitHub CLI verifier version and platform archive SHA-256 values are pinned
+in `src/verifier-pins.json`. Its archive is verified before extraction/execution.
+The optional `github-token` input defaults to the job GitHub token and needs only
+read access. No PAT or write permission is required.
 
-The default delivery architecture uses GitHub Actions for authoring/checks and
-Cloudflare Workers Builds for deployment. Setup does not change that division.
-Future GitHub-specific capabilities, when justified, belong in this same public
-Action repository and entry point.
+Outputs are `cfgb-version` and `cfgb-path`. PATH registration applies to subsequent
+steps in the same job. Each invocation creates a fresh verified installation in
+runner temporary storage; this implementation does not cache executable bytes.
 
-## Documentation
+## Building and publishing
 
-- [Canonical setup specification](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/09-github-action.md): installation, inputs/outputs, versioning and acceptance.
-- [Usage design](docs/usage.md): setup followed by direct CLI commands.
-- [CLI contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/01-cli.md).
-- [Build runtime contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/10-build-runtime.md): release assets, runtime prerequisites and retained CLI toolchain sessions.
-- [Delivery contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/04-delivery.md).
+CFGB v0.1.0 implements `build` and `version`. Configure the Node.js/package-manager
+prerequisites from its release requirements, then run the CLI. For a static host,
+including a GitHub Pages project site:
 
-Future implementation will provide one `action.yml` at the repository root for
-publication. Pin its full commit SHA separately from the requested CLI release.
-Action versions and CLI versions are independent; do not assume matching numbers.
+```sh
+cfgb build --base-url https://example.github.io/blog/ --static --out dist
+```
+
+Publish `dist/site/` through the hosting provider. This setup Action does not
+build or upload the site. See [usage](docs/usage.md) and the
+[example Pages workflow](https://github.com/ymmt2005/cfgb-example/tree/main/.github/workflows).
+
+## Project ownership
+
+- [cfgb](https://github.com/ymmt2005/cfgb) owns the CLI, embedded renderer/Worker,
+  specifications, schemas and domain behavior.
+- This repository owns verified CLI setup, runner installation and Action tests.
+- [cfgb-example](https://github.com/ymmt2005/cfgb-example) owns synthetic content,
+  the acceptance corpus and an example publication workflow.
+
+The [canonical setup contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/09-github-action.md)
+defines the boundary. Authoring, migration and Cloudflare upload commands remain
+later CLI work; their design does not imply availability in v0.1.0.
+
+Run installer tests with `node --test tests/*.test.mjs`. CI also installs the
+actual immutable release on native supported runners and invokes the CLI in a
+subsequent step.
 
 ## License
 
-This project, including its documentation and future Action implementation,
-is licensed under the [Apache License, Version 2.0](LICENSE).
+[Apache License, Version 2.0](LICENSE).
