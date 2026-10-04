@@ -100,8 +100,8 @@ example and the
 - [cfgb-example](https://github.com/ymmt2005/cfgb-example) owns synthetic content,
   the acceptance corpus and an example publication workflow.
 
-The [canonical setup contract](https://github.com/ymmt2005/cfgb/blob/main/docs/spec/09-github-action.md)
-defines the boundary. Authoring, migration and Cloudflare upload commands remain
+Setup inputs, outputs and installation behavior are documented in this README
+and [usage](docs/usage.md). Authoring, migration and Cloudflare upload commands remain
 later CLI work; their design does not imply availability in v0.1.0.
 
 Run installer tests with `node --test tests/*.test.mjs`. CI also installs the
