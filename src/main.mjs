@@ -5,12 +5,14 @@ import {
   exactVersion,
   installBinary,
   installVerifier,
+  packageManager,
   target,
 } from "./install.mjs";
 
 let directory;
 try {
   const version = exactVersion(process.env["INPUT_CFGB-VERSION"] || "");
+  const manager = packageManager(process.env["INPUT_PACKAGE-MANAGER"] || "");
   const runner = target(process.platform, process.arch);
   directory = await mkdtemp(
     path.join(process.env.RUNNER_TEMP || tmpdir(), "cfgb-setup-"),
@@ -26,6 +28,11 @@ try {
       process.env.GITHUB_TOKEN ||
       process.env.GH_TOKEN,
   });
+  if (manager)
+    await appendFile(
+      process.env.GITHUB_ENV,
+      `CFGB_PACKAGE_MANAGER=${manager}\n`,
+    );
   await appendFile(process.env.GITHUB_PATH, `${directory}\n`);
   await appendFile(
     process.env.GITHUB_OUTPUT,

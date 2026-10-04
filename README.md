@@ -4,20 +4,19 @@ Install an exact immutable [CFGB release](https://github.com/ymmt2005/cfgb/relea
 and register the CLI on PATH. Later workflow steps call `cfgb` directly. This is
 an independent open-source project, not affiliated with Cloudflare, Inc.
 
-```yaml
-- uses: ymmt2005/cfgb-action@<full-reviewed-action-commit-sha>
-  id: cfgb
-  with:
-    cfgb-version: v0.1.0
-- run: cfgb version
-```
-
 Pin the Action commit separately from the CLI version. `cfgb-version` is required;
 there is no implicit latest or version range. Linux, macOS and Windows runners
 are supported on amd64 and arm64. Setup needs no content checkout, blog settings,
 caller-configured Node.js, AI credentials or upload credentials. Self-hosted
 runners need internet access and a native `tar` capable of extracting the pinned
 GitHub CLI archive. GitHub-hosted runners provide it.
+
+The optional `package-manager` input selects `npm` or `pnpm` by exporting
+`CFGB_PACKAGE_MANAGER` to subsequent steps in the same job. Omission preserves
+the caller's environment; the CLI defaults to npm when that variable is unset.
+The Action sets the selection; caller steps install the chosen package manager
+using its version output. This input was added after Action `v0.2.0`; use a
+reviewed commit containing it or a subsequent release.
 
 ## Verification and outputs
 
@@ -46,8 +45,7 @@ Node.js runtime.
 | `npm-version` | Release metadata's `testedNpmVersion` |
 | `pnpm-version` | Release metadata's `testedPnpmVersion` |
 
-Toolchain outputs were added after Action `v0.1.0`; use a reviewed commit
-containing this change or a subsequent Action release. Missing or invalid
+Toolchain outputs are available from Action `v0.2.0`. Missing or invalid
 toolchain metadata fails setup rather than returning guessed versions.
 
 PATH registration applies to subsequent steps in the same job. Each invocation
@@ -76,6 +74,7 @@ steps:
     id: cfgb
     with:
       cfgb-version: v0.1.0
+      package-manager: npm
   - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
     with:
       node-version: ${{ steps.cfgb.outputs.node-version }}
@@ -88,8 +87,8 @@ steps:
 ```
 
 Publish `dist/site/` through the hosting provider. This setup Action does not
-build or upload the site. For pnpm, install `pnpm-version` instead and set
-`CFGB_PACKAGE_MANAGER=pnpm` on the build step. See [usage](docs/usage.md) for that
+build or upload the site. For pnpm, set `package-manager: pnpm` on the setup Action
+and install `pnpm-version` instead. See [usage](docs/usage.md) for that
 example and the
 [example Pages workflow](https://github.com/ymmt2005/cfgb-example/tree/main/.github/workflows).
 
