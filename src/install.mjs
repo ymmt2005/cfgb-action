@@ -69,7 +69,8 @@ export async function installVerifier(directory, runner, get = download) {
   execFileSync("tar", ["-xf", archive, "-C", extracted], { stdio: "pipe" });
   return path.join(
     extracted,
-    name.slice(0, -format.length - 1),
+    // The upstream Windows ZIP is not wrapped in a version directory.
+    runner.os === "windows" ? "" : name.slice(0, -format.length - 1),
     "bin",
     `gh${runner.extension}`,
   );
