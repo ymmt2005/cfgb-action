@@ -29,7 +29,9 @@ try {
   await appendFile(process.env.GITHUB_PATH, `${directory}\n`);
   await appendFile(
     process.env.GITHUB_OUTPUT,
-    `cfgb-version=${version}\ncfgb-path=${installed}\n`,
+    `cfgb-version=${version}\ncfgb-path=${installed.path}\n` +
+      `node-version=${installed.nodeVersion}\nnpm-version=${installed.npmVersion}\n` +
+      `pnpm-version=${installed.pnpmVersion}\n`,
   );
   console.log(`Installed CFGB ${version} for ${runner.os}/${runner.arch}`);
 } catch (error) {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -52,7 +52,16 @@ test("release evidence and asset verification precede executable invocation", as
       tag_name: "v0.1.0",
       immutable: true,
       draft: false,
-      assets: [{ name: "cfgb-linux-amd64" }],
+      assets: [
+        { name: "cfgb-linux-amd64" },
+        { name: "toolchain-requirements.json" },
+      ],
+    };
+    const requirements = {
+      cfgbVersion: "v0.1.0",
+      testedNodeVersion: "24.21.0",
+      testedNpmVersion: "12.2.0",
+      testedPnpmVersion: "12.8.1",
     };
     const options = {
       version: "v0.1.0",
@@ -62,12 +71,18 @@ test("release evidence and asset verification precede executable invocation", as
       token: "",
       lookup: async () => release,
       get: async (url, file) => {
-        events.push("download");
+        const name = path.basename(file);
+        events.push(`download ${name}`);
         assert.equal(
           url,
-          "https://github.com/ymmt2005/cfgb/releases/download/v0.1.0/cfgb-linux-amd64",
+          `https://github.com/ymmt2005/cfgb/releases/download/v0.1.0/${name}`,
         );
-        await writeFile(file, "test bytes");
+        await writeFile(
+          file,
+          name === "toolchain-requirements.json"
+            ? JSON.stringify(requirements)
+            : "test bytes",
+        );
       },
       run: (file, args) => {
         const event = file === "/trusted/gh" ? args[1] : "execute";
@@ -77,13 +92,26 @@ test("release evidence and asset verification precede executable invocation", as
       },
     };
     const installed = await installBinary(options);
-    assert.equal(installed, path.join(directory, "cfgb"));
-    assert.deepEqual(events, ["verify", "download", "verify-asset", "execute"]);
+    assert.deepEqual(installed, {
+      path: path.join(directory, "cfgb"),
+      nodeVersion: "24.21.0",
+      npmVersion: "12.2.0",
+      pnpmVersion: "12.8.1",
+    });
+    assert.deepEqual(events, [
+      "verify",
+      "download cfgb-linux-amd64",
+      "verify-asset",
+      "download toolchain-requirements.json",
+      "verify-asset",
+      "execute",
+    ]);
     for (const mutation of [
       { immutable: false },
       { draft: true },
       { tag_name: "v9.9.9" },
       { assets: [] },
+      { assets: [{ name: "cfgb-linux-amd64" }] },
     ]) {
       events.length = 0;
       await assert.rejects(
@@ -137,5 +165,129 @@ test("a corrupt pinned verifier archive is rejected before extraction", async ()
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("toolchain metadata must be verified and match the selected release before execution", async (t) => {
+  const requirements = {
+    cfgbVersion: "v0.1.0",
+    testedNodeVersion: "26.10.0",
+    testedNpmVersion: "12.3.1",
+    testedPnpmVersion: "12.9.2",
+  };
+  for (const scenario of [
+    { name: "selected release values", metadata: requirements },
+    {
+      name: "invalid metadata attestation",
+      metadata: requirements,
+      badEvidence: true,
+    },
+    {
+      name: "unavailable metadata download",
+      metadata: requirements,
+      unavailable: true,
+    },
+    { name: "malformed JSON", text: "{" },
+    {
+      name: "wrong release",
+      metadata: { ...requirements, cfgbVersion: "v9.9.9" },
+    },
+    {
+      name: "missing Node",
+      metadata: { ...requirements, testedNodeVersion: undefined },
+    },
+    {
+      name: "missing npm",
+      metadata: { ...requirements, testedNpmVersion: undefined },
+    },
+    {
+      name: "missing pnpm",
+      metadata: { ...requirements, testedPnpmVersion: undefined },
+    },
+    {
+      name: "non-string version",
+      metadata: { ...requirements, testedNpmVersion: 12 },
+    },
+    {
+      name: "empty version",
+      metadata: { ...requirements, testedNodeVersion: "" },
+    },
+    {
+      name: "output line injection",
+      metadata: { ...requirements, testedPnpmVersion: "12.9.2\nother=value" },
+    },
+  ]) {
+    await t.test(scenario.name, async () => {
+      const directory = await mkdtemp(
+        path.join(tmpdir(), "cfgb-metadata-test-"),
+      );
+      try {
+        const evidence = [];
+        let executed = false;
+        const promise = installBinary({
+          version: "v0.1.0",
+          runner: target("linux", "x64"),
+          directory,
+          gh: "/trusted/gh",
+          token: "",
+          lookup: async () => ({
+            tag_name: "v0.1.0",
+            immutable: true,
+            draft: false,
+            assets: [
+              { name: "cfgb-linux-amd64" },
+              { name: "toolchain-requirements.json" },
+            ],
+          }),
+          get: async (url, file) => {
+            const metadata = file.endsWith("toolchain-requirements.json");
+            if (metadata && scenario.unavailable)
+              throw new Error("metadata download failed");
+            await writeFile(
+              file,
+              metadata
+                ? (scenario.text ?? JSON.stringify(scenario.metadata))
+                : "binary bytes",
+            );
+          },
+          run: (file, args) => {
+            if (file !== "/trusted/gh") {
+              assert.deepEqual(evidence, [
+                "cfgb-linux-amd64",
+                "toolchain-requirements.json",
+              ]);
+              executed = true;
+              return "cfgb v0.1.0\n";
+            }
+            if (args[1] === "verify-asset") {
+              const name = path.basename(args[3]);
+              if (
+                name === "toolchain-requirements.json" &&
+                scenario.badEvidence
+              )
+                throw new Error("invalid metadata attestation");
+              evidence.push(name);
+            }
+          },
+        });
+        if (scenario.name === "selected release values") {
+          assert.deepEqual(await promise, {
+            path: path.join(directory, "cfgb"),
+            nodeVersion: "26.10.0",
+            npmVersion: "12.3.1",
+            pnpmVersion: "12.9.2",
+          });
+          assert.equal(executed, true);
+        } else {
+          await assert.rejects(promise);
+          assert.equal(executed, false);
+          await assert.rejects(access(path.join(directory, "cfgb")), {
+            code: "ENOENT",
+          });
+        }
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
   }
 });
