@@ -4,6 +4,9 @@ inputs:
   cfgb-version:
     description: Exact CFGB release tag (for example v0.1.0)
     required: true
+  package-manager:
+    description: Optional npm or pnpm selection for CFGB_PACKAGE_MANAGER in subsequent steps
+    required: false
   github-token:
     description: Token for read-only public release verification
     default: ${{ github.token }}

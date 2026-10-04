@@ -7,8 +7,18 @@ import {
   exactVersion,
   installBinary,
   installVerifier,
+  packageManager,
   target,
 } from "../src/install.mjs";
+
+test("package-manager input accepts supported choices and optional omission", () => {
+  assert.equal(packageManager(), "");
+  assert.equal(packageManager(""), "");
+  assert.equal(packageManager("npm"), "npm");
+  assert.equal(packageManager("pnpm"), "pnpm");
+  for (const invalid of ["yarn", "PNPM", "pnpm\nOTHER=value"])
+    assert.throws(() => packageManager(invalid), /package-manager must be/);
+});
 
 test("runner selection covers native release targets and rejects unsupported runners", () => {
   for (const [platform, os] of [

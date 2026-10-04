@@ -26,6 +26,12 @@ export function exactVersion(version) {
   return version;
 }
 
+export function packageManager(value = "") {
+  if (!["", "npm", "pnpm"].includes(value))
+    throw new Error("package-manager must be npm or pnpm when supplied");
+  return value;
+}
+
 async function download(url, destination) {
   const response = await fetch(url);
   if (!response.ok)

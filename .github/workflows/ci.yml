@@ -22,16 +22,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          [
-            ubuntu-latest,
-            ubuntu-24.04-arm,
-            macos-15-intel,
-            macos-14,
-            windows-latest,
-            windows-11-arm,
-          ]
+        include:
+          - runner: ubuntu-latest
+            manager: ""
+          - runner: ubuntu-24.04-arm
+            manager: npm
+          - runner: macos-15-intel
+            manager: pnpm
+          - runner: macos-14
+            manager: ""
+          - runner: windows-latest
+            manager: npm
+          - runner: windows-11-arm
+            manager: pnpm
     runs-on: ${{ matrix.runner }}
+    env:
+      # Omitted inputs preserve this existing selection; explicit npm overrides it.
+      CFGB_PACKAGE_MANAGER: pnpm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       # Setup needs no content checkout or caller-configured Node/toolchain.
@@ -39,6 +46,7 @@ jobs:
         id: cfgb
         with:
           cfgb-version: v0.1.0
+          package-manager: ${{ matrix.manager }}
       - name: Use the installed CLI in a subsequent step
         shell: bash
         env:
@@ -47,6 +55,7 @@ jobs:
           TESTED_NODE: ${{ steps.cfgb.outputs.node-version }}
           TESTED_NPM: ${{ steps.cfgb.outputs.npm-version }}
           TESTED_PNPM: ${{ steps.cfgb.outputs.pnpm-version }}
+          EXPECTED_MANAGER: ${{ matrix.manager || 'pnpm' }}
         run: |
           test "$INSTALLED_VERSION" = v0.1.0
           test -f "$INSTALLED_PATH"
@@ -54,6 +63,7 @@ jobs:
           test "$TESTED_NODE" = '24.21.0'
           test "$TESTED_NPM" = '12.2.0'
           test "$TESTED_PNPM" = '12.8.1'
+          test "$CFGB_PACKAGE_MANAGER" = "$EXPECTED_MANAGER"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: ${{ steps.cfgb.outputs.node-version }}
