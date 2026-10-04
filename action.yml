@@ -13,6 +13,12 @@ outputs:
     description: Verified installed version
   cfgb-path:
     description: Absolute path to the installed executable
+  node-version:
+    description: Tested Node.js version from the selected CFGB release
+  npm-version:
+    description: Tested npm version from the selected CFGB release
+  pnpm-version:
+    description: Tested pnpm version from the selected CFGB release
 runs:
   using: node24
   main: src/main.mjs

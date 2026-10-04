@@ -95,8 +95,11 @@ export async function installBinary({
   )
     throw new Error("The selected release must be published and immutable");
   const name = `cfgb-${runner.os}-${runner.arch}${runner.extension}`;
-  if (!release.assets.some((asset) => asset.name === name))
-    throw new Error(`The selected release has no ${name} asset`);
+  const requirementsName = "toolchain-requirements.json";
+  for (const required of [name, requirementsName]) {
+    if (!release.assets.some((asset) => asset.name === required))
+      throw new Error(`The selected release has no ${required} asset`);
+  }
   const env = {
     ...process.env,
     GH_TOKEN: token,
@@ -105,19 +108,36 @@ export async function installBinary({
   };
   const ghRun = (args) => run(gh, args, { env, stdio: "pipe" });
   ghRun(["release", "verify", version, "--repo", `github.com/${repository}`]);
-  const asset = path.join(directory, name);
-  await get(
-    `https://github.com/${repository}/releases/download/${version}/${name}`,
-    asset,
-  );
-  ghRun([
-    "release",
-    "verify-asset",
-    version,
-    asset,
-    "--repo",
-    `github.com/${repository}`,
-  ]);
+  const verifiedAsset = async (assetName) => {
+    const file = path.join(directory, assetName);
+    await get(
+      `https://github.com/${repository}/releases/download/${version}/${assetName}`,
+      file,
+    );
+    ghRun([
+      "release",
+      "verify-asset",
+      version,
+      file,
+      "--repo",
+      `github.com/${repository}`,
+    ]);
+    return file;
+  };
+  const asset = await verifiedAsset(name);
+  const requirements = await verifiedAsset(requirementsName);
+  const metadata = JSON.parse(await readFile(requirements, "utf8"));
+  if (metadata?.cfgbVersion !== version)
+    throw new Error("Toolchain requirements version mismatch");
+  const toolchain = {
+    nodeVersion: metadata.testedNodeVersion,
+    npmVersion: metadata.testedNpmVersion,
+    pnpmVersion: metadata.testedPnpmVersion,
+  };
+  for (const [key, value] of Object.entries(toolchain)) {
+    if (typeof value !== "string" || !value.trim() || /[\r\n]/.test(value))
+      throw new Error(`Toolchain requirements lack a single-line ${key}`);
+  }
   const installed = path.join(directory, `cfgb${runner.extension}`);
   await rename(asset, installed);
   if (runner.os !== "windows") await chmod(installed, 0o755);
@@ -127,5 +147,5 @@ export async function installBinary({
   }).trim();
   if (reported !== `cfgb ${version}`)
     throw new Error(`Installed version mismatch: ${reported}`);
-  return installed;
+  return { path: installed, ...toolchain };
 }
